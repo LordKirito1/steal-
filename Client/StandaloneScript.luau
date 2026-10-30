@@ -437,14 +437,57 @@ local function teleportAndSteal(eggItem)
     end)
 end
 
+local function fetchPublicRobloxServers()
+    local url = string.format("https://games.roproxy.com/v1/games/%d/servers/Public?sortOrder=Desc&limit=25", game.PlaceId)
+    local data, code = doHttp(url, "GET", nil)
+    local validServers = {}
+    if data and type(data) == "table" and data.data then
+        for _, s in ipairs(data.data) do
+            if s.id and s.id ~= game.JobId and s.playing and s.maxPlayers and s.playing < s.maxPlayers then
+                table.insert(validServers, {
+                    jobId = s.id,
+                    placeId = game.PlaceId,
+                    playing = s.playing,
+                    maxPlayers = s.maxPlayers
+                })
+            end
+        end
+    end
+    return validServers
+end
+
 local function joinServer(jobId, placeId)
     local targetPlace = placeId or game.PlaceId
     if jobId == game.JobId then
         warn("[Chilli Finder] Ya estás en este servidor.")
         return
     end
+
+    -- Validar si el JobId es un GUID real de Roblox o un placeholder
+    local isGuid = jobId and string.match(jobId, "^%x%x%x%x%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%x%x%x%x%x%x%x%x$")
+    if not isGuid then
+        print("[Chilli Finder] Buscando servidor público activo real para evitar Error 771...")
+        local realServers = fetchPublicRobloxServers()
+        if #realServers > 0 then
+            local chosen = realServers[math.random(1, #realServers)]
+            print("[Chilli Finder] Teletransportando a servidor público real: " .. tostring(chosen.jobId))
+            TeleportService:TeleportToPlaceInstance(targetPlace, chosen.jobId, LocalPlayer)
+            return
+        else
+            print("[Chilli Finder] Haciendo Server Hop a nuevo servidor...")
+            TeleportService:Teleport(targetPlace, LocalPlayer)
+            return
+        end
+    end
+
     print("[Chilli Finder] Conectando al servidor: " .. tostring(jobId))
-    TeleportService:TeleportToPlaceInstance(targetPlace, jobId, LocalPlayer)
+    local ok, err = pcall(function()
+        TeleportService:TeleportToPlaceInstance(targetPlace, jobId, LocalPlayer)
+    end)
+    if not ok then
+        warn("[Chilli Finder] Falló teletransporte específico, cambiando a servidor aleatorio...")
+        TeleportService:Teleport(targetPlace, LocalPlayer)
+    end
 end
 
 -- Reproducir sonido de alerta
