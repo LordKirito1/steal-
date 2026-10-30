@@ -96,36 +96,63 @@ Abre [`Client/Modules/Config.luau`](file:///c:/Users/SANTANA/Documents/Steal%20A
 
 ---
 
-## 3. Backend & Base de Datos (Node.js o Python)
+---
 
-### Opción A: Node.js (Recomendada)
-1. Entra a la carpeta del backend:
-   ```bash
+## 3. API en la Nube 100% Gratis 24/7 (Para el Radar en Vivo)
+
+Para que el Radar en Vivo te avise cuando aparezcan huevos en otros servidores (aunque tu PC esté apagada):
+
+### 🌐 Opción 1: Render.com (Recomendada - 24/7 Gratis)
+1. Entra a [render.com](https://render.com) e inicia sesión gratis con tu cuenta de **GitHub**.
+2. Haz click en **"New"** -> **"Web Service"** y selecciona tu repositorio: `LordKirito1/steal-`.
+3. Render detectará automáticamente el archivo [`render.yaml`](file:///h:/Project%20BS-Smart/PROYECTO%20NUEVOP/render.yaml) del proyecto.
+4. Haz click en **"Create Web Service"**. En 1 minuto tendrás tu enlace HTTPS gratuito:
+   ```text
+   https://tu-api-steal.onrender.com
+   ```
+5. En Roblox, pulsa el botón **`⚙️`** en el menú y pega esa URL. ¡Listo! El radar ya estará conectado a la nube para siempre.
+
+### ⚡ Opción 2: Túnel Rápido desde tu PC (Localtunnel)
+Si prefieres correrlo en tu máquina:
+1. Inicia el servidor:
+   ```powershell
    cd Backend
-   npm install
    npm start
    ```
-2. **Características:**
-   - Si Redis está activo en `localhost:6379`, utiliza claves con expiración (`EX: 180s`).
-   - **Fallback automático:** Si Redis no está instalado o activo, el servidor conmuta a un almacén en memoria con temporizadores automáticos sin caerse ni generar errores.
-
-### Opción B: Python (FastAPI)
-1. Entra a la carpeta:
-   ```bash
-   cd Backend_Python
-   pip install -r requirements.txt
-   python app.py
+2. En otra terminal abre un túnel gratuito:
+   ```powershell
+   npx localtunnel --port 3000
    ```
+3. Copia el link generado (ej. `https://xxxx.loca.lt`) y pégalo en el botón **`⚙️`** del script.
 
 ---
 
-## 4. Interfaz Gráfica (UI) y Server Hopping
+## 4. Interfaz Gráfica Dual Hub (Steal Panel & Chilli Finder)
 
-- **Librería Rayfield:**
-  Proporciona una ventana moderna con:
-  - **Dropdown de Rareza Mínima:** Filtra servidores según el tipo de huevo (desde `Common` hasta `Secret`).
-  - **Lista de Servidores Activos:** Muestra nombre del mejor huevo, valor formateado (ej. `15.0K`, `1.2M`) y tiempo restante del TTL (`TTL: 140s`).
-  - **Botón "Join":** Invoca `TeleportService:TeleportToPlaceInstance(placeId, jobId, LocalPlayer)` para transferir al jugador inmediatamente al servidor deseado.
-- **Uso directo:**
-  Para usar todo el sistema en un solo archivo sin dependencias de módulos de Studio, copia y pega el código de [`Client/StandaloneScript.luau`](file:///c:/Users/SANTANA/Documents/Steal%20An%20egg%20scripte/Client/StandaloneScript.luau).
+### 🥚 Steal Panel (Robo en el Servidor Actual)
+- **Vista en tiempo real:** Lista los mejores huevos y mascotas de los stands del servidor actual.
+- **Detalles completos:** Muestra el nombre en color de rareza (*Hexed Pumpkin, Crowshade, Holy Peacock*), tasa de producción en verde brillante (`$123.1M/s`), multiplicador (`x6.15`), tag de evento (*Halloween*) y botón **`[ STEAL ]`**.
+- **Acción instantánea:** Al pulsar **`STEAL`**, el jugador se teletransporta al stand y activa automáticamente el `ProximityPrompt`.
+- **Filtros rápidos:** Botones de `[Auto Steal: ON/OFF]`, `[Halloween: ON/OFF]`, `[Eggs: All]` y ordenamiento por `Value`.
+- **Speed Boost:** Slider superior `Boost speed [120]` para ajustar la velocidad de carrera (`WalkSpeed`).
+
+### 🌶️ Chilli Finder con Radar en Vivo (Server Hopping)
+- **🚨 Radar en Vivo:** Emite un **sonido de alerta** y despliega un **banner flotante superior** en el instante en que detecta un huevo valioso en otro servidor con botón directo **`[ UNIRSE AHORA ]`**.
+- **Telemetría Automática:** Reporta tus propios servidores a la nube para que todas tus cuentas compartan la misma red de radar.
+- **Monitoreo global:** Consulta en vivo servidores reportados con los huevos más valiosos del mundo (*Werewolf $54.14B/s x9.35*, etc.).
+- **Filtros integrados:** `[FORCE JOIN: 60s]`, `[MIN VALUE: 1T/s]`, `[RARITY: Any]`, `[ACCOUNT: Free]`.
+- **Botón `[ Join ]`:** Conexión directa al servidor mediante `TeleportService:TeleportToPlaceInstance`.
+- **Pestañas y Control:** Alterna entre ambos paneles con un solo click y minimiza la ventana con el botón lateral rojo (`>`).
+
+---
+
+## 5. Ejecución Rápida en Roblox (Loadstring)
+
+Pega esta línea directamente en tu ejecutor (Delta, Wave, Solara, Codex, Fluxus, etc.):
+
+```lua
+loadstring(game:HttpGet("https://raw.githubusercontent.com/LordKirito1/steal-/main/Client/StandaloneScript.luau"))()
+```
+
+
 

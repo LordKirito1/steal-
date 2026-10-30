@@ -28,7 +28,7 @@ if not ModulesFolder then
     warn("[Main] Modules no encontrados en la jerarquía. Detectada ejecución vía loadstring/executor.")
     warn("[Main] Cargando versión monolítica StandaloneScript...")
     local okStandalone, res = pcall(function()
-        return loadstring(game:HttpGet("https://raw.githubusercontent.com/TU_USUARIO/TU_REPO/main/Client/StandaloneScript.luau"))()
+        return loadstring(game:HttpGet("https://raw.githubusercontent.com/LordKirito1/steal-/main/Client/StandaloneScript.luau"))()
     end)
     if not okStandalone then
         warn("[Main] Para ejecutar vía loadstring, usa directamente StandaloneScript.luau o /script en el backend.")

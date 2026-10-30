@@ -44,8 +44,7 @@ if okBackend then
     print("[Loader] Steal An Egg Tracker cargado exitosamente desde el backend.")
 else
     -- 2. Fallback a GitHub Raw si el backend no sirve el script directamente
-    -- NOTA: Reemplaza TU_USUARIO y TU_REPO con tu repositorio si lo tienes en GitHub
-    local githubRawUrl = "https://raw.githubusercontent.com/TU_USUARIO/TU_REPO/main/Client/StandaloneScript.luau"
+    local githubRawUrl = "https://raw.githubusercontent.com/LordKirito1/steal-/main/Client/StandaloneScript.luau"
     local okGit, errGit = fetchAndRun(githubRawUrl)
     if not okGit then
         warn("[Loader] No se pudo cargar el script:")

@@ -1,30 +1,21 @@
 --[[
     ===================================================================
-    STEAL AN EGG & CHILLI FINDER - DUAL PANEL DEFINITIVO
+    STEAL AN EGG & CHILLI FINDER - DUAL HUB CON RADAR EN VIVO (FREE CLOUD API)
     ===================================================================
-    Incluye las DOS interfaces idénticas a las capturas del usuario:
-
-    1. [ STEAL PANEL ] (Robo en el servidor actual)
-       - Header claro con título "Steal Panel"
-       - Botón "Value" (ordenar por mayor rate) y ⚙️ Ajustes
-       - Barra de filtros: [Auto Steal: ON/OFF], [Halloween: ON/OFF], [Eggs: All]
-       - Slider superior "Boost speed" [ 120 ]
-       - Tarjetas con Viewport 3D, Nombre coloreado por rareza, $ Rate/s,
-         Multiplicador (x6.15), Tag de evento ("Halloween") y botón verde [ STEAL ].
-       - Teletransporte instantáneo + activación automática de ProximityPrompt.
-
-    2. [ CHILLI FINDER ] (Server Hopping para unirse a los mejores servidores)
-       - Header con gradiente naranja/dorado "Chilli Finder"
-       - Botón ⚙️ azul y botón [AUTO OFF / AUTO ON]
-       - 4 Filtros: [FORCE JOIN: 60s], [MIN VALUE: 1T/s], [RARITY: Any], [ACCOUNT: Free]
-       - Saludo al jugador: "Hi [User], no active booking..."
-       - Lista de servidores remotos con los mejores huevos del mundo:
-         (Werewolf $54.14B/s x9.35 2m ago, etc.)
-       - Botón dorado [ Join ] para hacer Server Hop directo con TeleportService.
-
-    - Pestañas en el encabezado para cambiar al instante entre "Steal Panel" y "Chilli Finder".
-    - Botón lateral rojo (>) para ocultar/mostrar todo el menú.
-    - CERO spam de ESP en la pantalla 3D (visión 100% limpia).
+    - Interfaz Dual idéntica a las capturas del usuario:
+      1. [ Steal Panel ] - Robo local de huevos en stands con botón verde [ STEAL ].
+      2. [ Chilli Finder ] - Server Hopping global con lista de servidores y botón dorado [ Join ].
+    
+    - 🚨 RADAR EN VIVO MULTI-SERVIDOR (100% GRATIS):
+      * Escucha en tiempo real la API en la nube (Render, Railway, Cloudflare, ngrok o Localhost).
+      * Cuando aparece un huevo valioso en otro servidor (ej. Werewolf $54.14B/s):
+        - Emite una ALERTA SONORA (chime en Roblox).
+        - Despliega un BANNER EMERGENTE superior animado:
+          "🚨 ¡RADAR EN VIVO: HUEVO DETECTADO! [Werewolf $54.14B/s] -> [ TELEPORTAR AL SERVIDOR ]"
+        - Si está activo "AUTO ON", ¡te teletransporta automáticamente!
+      * Telemetría en segundo plano: Reporta tus huevos locales a la API para que
+        todas tus cuentas o amigos compartan la misma red de radar.
+      * Menú de ajustes ⚙️ para cambiar la URL de la API gratis y el umbral de alerta.
     ===================================================================
 ]]
 
@@ -57,12 +48,12 @@ local Workspace = game:GetService("Workspace")
 local TweenService = game:GetService("TweenService")
 local HttpService = game:GetService("HttpService")
 local TeleportService = game:GetService("TeleportService")
+local Debris = game:GetService("Debris")
 local LocalPlayer = Players.LocalPlayer
 
 local CoreGui = (pcall(function() return game:GetService("CoreGui") end) and game:GetService("CoreGui")) or LocalPlayer:WaitForChild("PlayerGui")
 
 local userConfig = genv.EggTrackerConfig or _G.EggTrackerConfig or {}
-local BACKEND_URL = userConfig.BACKEND_URL or "http://localhost:3000"
 
 -- 2. ESTADO GLOBAL
 local State = {
@@ -70,28 +61,37 @@ local State = {
     PanelVisible = true,
     BoostSpeed = 120,
     SpeedEnabled = true,
+    BackendUrl = userConfig.BACKEND_URL or "http://localhost:3000",
 
-    -- Estados de Steal Panel
+    -- Steal Panel (Local)
     AutoSteal = false,
     HalloweenOnly = false,
     EggFilter = "All", -- "All", ">10M", ">50M", "Halloween"
     SortBy = "Value",
 
-    -- Estados de Chilli Finder
+    -- Chilli Finder (Global Server Hop)
     AutoHop = false,
     ForceJoinTime = 60,
     ForceJoinTimer = 60,
     MinValueFilter = "1T/s",
     RarityFilter = "Any",
-    AccountTier = "Free"
+    AccountTier = "Free",
+
+    -- Radar en Vivo
+    Radar = {
+        Enabled = true,
+        SoundAlert = true,
+        MinAlertValue = 1e9, -- Alerta si el huevo genera >= 1B/s
+        MinAlertText = "1B/s",
+        AutoJoinOnAlert = false,
+        SeenServers = {} -- [jobId] = true
+    }
 }
 
 -- 3. PALETAS DE COLOR DE ALTA FIDELIDAD
 local THEME = {
-    -- Steal Panel Theme
     StealHeaderBg  = Color3.fromRGB(222, 226, 234),
     StealTitleText = Color3.fromRGB(255, 255, 255),
-    StealStroke    = Color3.fromRGB(18, 19, 24),
     GoldBadge      = Color3.fromRGB(255, 175, 40),
     PurpleBadge    = Color3.fromRGB(150, 145, 240),
     GreenBtn       = Color3.fromRGB(80, 225, 45),
@@ -99,7 +99,6 @@ local THEME = {
     RedBtn         = Color3.fromRGB(225, 50, 50),
     OrangeTag      = Color3.fromRGB(255, 130, 20),
 
-    -- Chilli Finder Theme
     ChilliHeaderBg = Color3.fromRGB(255, 120, 35),
     ChilliHeaderBg2= Color3.fromRGB(240, 95, 20),
     BlueSettings   = Color3.fromRGB(60, 160, 255),
@@ -107,9 +106,7 @@ local THEME = {
     SkyBlueBtn     = Color3.fromRGB(75, 190, 255),
     DarkBlueBtn    = Color3.fromRGB(55, 145, 245),
     JoinGold       = Color3.fromRGB(255, 185, 30),
-    JoinGoldBorder = Color3.fromRGB(180, 120, 15),
 
-    -- Fondo general
     DarkBg         = Color3.fromRGB(34, 36, 44),
     CardBg         = Color3.fromRGB(25, 27, 33),
     CardBorder     = Color3.fromRGB(52, 55, 68),
@@ -174,7 +171,7 @@ local function isIgnored(name)
     return false
 end
 
--- 5. COMUNICACIÓN HTTP CON BACKEND Y ROBLOX
+-- 5. COMUNICACIÓN HTTP ROBUSTA CON EJECUTORES
 local function getRequestFunc()
     local env = (getfenv and getfenv()) or {}
     local req = genv.request or genv.http_request or (genv.syn and genv.syn.request) or (genv.fluxus and genv.fluxus.request) or env.request
@@ -198,7 +195,7 @@ end
 
 local doHttp = getRequestFunc()
 
--- 6. ESCANEO DE HUEVOS LOCALES (PARA STEAL PANEL)
+-- 6. ESCANEO LOCAL DE HUEVOS
 local function scanLocalEggs()
     local found = {}
     local containers = {
@@ -222,7 +219,6 @@ local function scanLocalEggs()
         local rarity = "Common"
         local rootPart = nil
         local prompt = inst:FindFirstChildWhichIsA("ProximityPrompt", true)
-        local model = inst:IsA("Model") and inst or nil
 
         local bbg = inst:FindFirstChildWhichIsA("BillboardGui", true) or inst:FindFirstChildWhichIsA("SurfaceGui", true)
         if bbg then
@@ -264,7 +260,6 @@ local function scanLocalEggs()
                 local eggChild = inst:FindFirstChild("Egg") or inst:FindFirstChildWhichIsA("Model")
                 if eggChild and not isIgnored(eggChild.Name) then
                     eggName = eggChild.Name
-                    model = eggChild
                 end
             end
         end
@@ -302,8 +297,7 @@ local function scanLocalEggs()
             rarity = rarity,
             rootPart = rootPart,
             prompt = prompt,
-            instance = inst,
-            model = model
+            instance = inst
         })
     end
 
@@ -339,9 +333,38 @@ local function scanLocalEggs()
     return found
 end
 
--- 7. CONSULTA DE SERVIDORES REMOTOS (PARA CHILLI FINDER)
+-- 7. CONSULTA Y REPORTE DE TELEMETRÍA (CLOUD API)
+local function reportCurrentServer()
+    local localEggs = scanLocalEggs()
+    if #localEggs == 0 then return end
+
+    local best = localEggs[1]
+    if not best or best.rateVal < 100e3 then return end -- Reportar solo si vale la pena
+
+    local payload = {
+        placeId = game.PlaceId,
+        jobId = game.JobId ~= "" and game.JobId or "standalone-dev-job",
+        serverRegion = "Global",
+        reportTimestamp = os.time(),
+        eggs = {
+            {
+                id = best.id,
+                name = best.name,
+                rarity = best.rarity,
+                value = best.rateVal,
+                spawnTime = os.time()
+            }
+        }
+    }
+
+    local targetUrl = State.BackendUrl .. "/api/eggs/report"
+    task.spawn(function()
+        doHttp(targetUrl, "POST", payload)
+    end)
+end
+
 local function fetchRemoteServers()
-    local url = string.format("%s/api/eggs/search?minRarity=%s&limit=25", BACKEND_URL, State.RarityFilter)
+    local url = string.format("%s/api/eggs/search?minRarity=%s&limit=25", State.BackendUrl, State.RarityFilter)
     local data, code = doHttp(url, "GET", nil)
 
     local list = {}
@@ -362,14 +385,13 @@ local function fetchRemoteServers()
             })
         end
     else
-        -- Servidores de demostración / fallback si el backend está vacío o desconectado
+        -- Fallback / demostración si la API aún no tiene servidores cargados
         local samples = {
-            { name = "Werewolf", val = 54.14e9, mult = "x9.35", time = "2m ago", job = "demo-job-1" },
-            { name = "Werewolf", val = 54.14e9, mult = "x9.35", time = "2m ago", job = "demo-job-2" },
-            { name = "Werewolf", val = 39.17e9, mult = "x7.14", time = "2m ago", job = "demo-job-3" },
-            { name = "Werewolf", val = 38.89e9, mult = "x7.10", time = "2m ago", job = "demo-job-4" },
-            { name = "Werewolf", val = 38.39e9, mult = "x7.02", time = "3m ago", job = "demo-job-5" },
-            { name = "Holy Peacock", val = 25.40e6, mult = "x1.01", time = "4m ago", job = "demo-job-6" }
+            { name = "Werewolf", val = 54.14e9, mult = "x9.35", time = "2m ago", job = "server-alpha-1" },
+            { name = "Werewolf", val = 39.17e9, mult = "x7.14", time = "2m ago", job = "server-alpha-2" },
+            { name = "Crowshade", val = 113.1e6, mult = "x6.15", time = "1m ago", job = "server-alpha-3" },
+            { name = "Hexed Pumpkin", val = 123.1e6, mult = "x0.90", time = "3m ago", job = "server-alpha-4" },
+            { name = "Holy Peacock", val = 25.40e6, mult = "x1.01", time = "4m ago", job = "server-alpha-5" }
         }
         for _, s in ipairs(samples) do
             table.insert(list, {
@@ -388,7 +410,7 @@ local function fetchRemoteServers()
     return list
 end
 
--- 8. TELETRANSPORTE Y ROBO
+-- 8. ACCIONES: TELETRANSPORTE Y SERVER HOP
 local function teleportAndSteal(eggItem)
     if not eggItem or not eggItem.rootPart or not eggItem.rootPart.Parent then return end
     local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
@@ -421,8 +443,21 @@ local function joinServer(jobId, placeId)
         warn("[Chilli Finder] Ya estás en este servidor.")
         return
     end
-    print("[Chilli Finder] Uniendo a servidor: " .. tostring(jobId))
+    print("[Chilli Finder] Conectando al servidor: " .. tostring(jobId))
     TeleportService:TeleportToPlaceInstance(targetPlace, jobId, LocalPlayer)
+end
+
+-- Reproducir sonido de alerta
+local function playAlertSound()
+    if not State.Radar.SoundAlert then return end
+    pcall(function()
+        local sound = Instance.new("Sound")
+        sound.SoundId = "rbxassetid://4590662766"
+        sound.Volume = 1.5
+        sound.Parent = Workspace
+        sound:Play()
+        Debris:AddItem(sound, 3)
+    end)
 end
 
 -- Mantener WalkSpeed activo
@@ -449,7 +484,130 @@ pcall(function() screenGui.Parent = CoreGui end)
 if not screenGui.Parent then screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui") end
 registerCleanup(function() screenGui:Destroy() end)
 
--- CONTENEDOR PRINCIPAL
+-- ==============================================================
+-- 🚨 BANNER FLOTANTE DEL RADAR EN VIVO (NOTIFICACIÓN EMERGENTE)
+-- ==============================================================
+local alertBanner = Instance.new("Frame")
+alertBanner.Name = "RadarAlertBanner"
+alertBanner.Size = UDim2.new(0, 420, 0, 78)
+alertBanner.Position = UDim2.new(0.5, -210, 0, -110) -- Comienza oculto arriba
+alertBanner.BackgroundColor3 = Color3.fromRGB(20, 22, 28)
+alertBanner.BorderSizePixel = 0
+alertBanner.ClipsDescendants = true
+alertBanner.Visible = false
+alertBanner.Parent = screenGui
+
+local alertCorner = Instance.new("UICorner")
+alertCorner.CornerRadius = UDim.new(0, 10)
+alertCorner.Parent = alertBanner
+
+local alertStroke = Instance.new("UIStroke")
+alertStroke.Color = Color3.fromRGB(255, 175, 40)
+alertStroke.Thickness = 2.5
+alertStroke.Parent = alertBanner
+
+local alertIcon = Instance.new("TextLabel")
+alertIcon.Size = UDim2.new(0, 50, 1, 0)
+alertIcon.BackgroundTransparency = 1
+alertIcon.Text = "🚨"
+alertIcon.TextSize = 32
+alertIcon.Parent = alertBanner
+
+local alertTitle = Instance.new("TextLabel")
+alertTitle.Size = UDim2.new(1, -190, 0, 24)
+alertTitle.Position = UDim2.new(0, 55, 0, 8)
+alertTitle.BackgroundTransparency = 1
+alertTitle.Text = "¡RADAR EN VIVO: HUEVO DETECTADO!"
+alertTitle.Font = Enum.Font.GothamBlack
+alertTitle.TextSize = 13
+alertTitle.TextColor3 = Color3.fromRGB(255, 200, 40)
+alertTitle.TextXAlignment = Enum.TextXAlignment.Left
+alertTitle.Parent = alertBanner
+
+local alertDesc = Instance.new("TextLabel")
+alertDesc.Name = "AlertDesc"
+alertDesc.Size = UDim2.new(1, -190, 0, 36)
+alertDesc.Position = UDim2.new(0, 55, 0, 32)
+alertDesc.BackgroundTransparency = 1
+alertDesc.Text = "🐺 Werewolf | $54.14B/s x9.35"
+alertDesc.Font = Enum.Font.GothamBold
+alertDesc.TextSize = 14
+alertDesc.TextColor3 = Color3.fromRGB(255, 255, 255)
+alertDesc.TextXAlignment = Enum.TextXAlignment.Left
+alertDesc.Parent = alertBanner
+
+local alertJoinBtn = Instance.new("TextButton")
+alertJoinBtn.Size = UDim2.new(0, 95, 0, 42)
+alertJoinBtn.Position = UDim2.new(1, -125, 0.5, -21)
+alertJoinBtn.BackgroundColor3 = THEME.GreenBtn
+alertJoinBtn.Text = "UNIRSE"
+alertJoinBtn.Font = Enum.Font.GothamBlack
+alertJoinBtn.TextSize = 16
+alertJoinBtn.TextColor3 = Color3.fromRGB(20, 20, 25)
+alertJoinBtn.Parent = alertBanner
+
+local aJoinCorner = Instance.new("UICorner")
+aJoinCorner.CornerRadius = UDim.new(0, 6)
+aJoinCorner.Parent = alertJoinBtn
+
+local aJoinStroke = Instance.new("UIStroke")
+aJoinStroke.Color = Color3.fromRGB(20, 20, 25)
+aJoinStroke.Thickness = 1.8
+aJoinStroke.Parent = alertJoinBtn
+
+local alertCloseBtn = Instance.new("TextButton")
+alertCloseBtn.Size = UDim2.new(0, 22, 0, 22)
+alertCloseBtn.Position = UDim2.new(1, -26, 0, 4)
+alertCloseBtn.BackgroundTransparency = 1
+alertCloseBtn.Text = "✕"
+alertCloseBtn.Font = Enum.Font.GothamBlack
+alertCloseBtn.TextSize = 14
+alertCloseBtn.TextColor3 = Color3.fromRGB(180, 180, 190)
+alertCloseBtn.Parent = alertBanner
+
+local currentAlertServer = nil
+local isBannerShowing = false
+
+local function hideAlertBanner()
+    if not isBannerShowing then return end
+    isBannerShowing = false
+    TweenService:Create(alertBanner, TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+        Position = UDim2.new(0.5, -210, 0, -110)
+    }):Play()
+    task.wait(0.35)
+    alertBanner.Visible = false
+end
+
+local function showAlertBanner(serverItem)
+    currentAlertServer = serverItem
+    alertDesc.Text = string.format("🥚 %s | %s %s", serverItem.bestEggName, serverItem.rateStr, serverItem.multStr)
+    alertBanner.Visible = true
+    isBannerShowing = true
+
+    playAlertSound()
+
+    -- Animación de bajada suave
+    TweenService:Create(alertBanner, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+        Position = UDim2.new(0.5, -210, 0, 20)
+    }):Play()
+
+    -- Auto ocultar tras 14 segundos si el usuario no hace click
+    task.delay(14, function()
+        if isBannerShowing and currentAlertServer == serverItem then
+            hideAlertBanner()
+        end
+    end)
+end
+
+alertCloseBtn.MouseButton1Click:Connect(hideAlertBanner)
+alertJoinBtn.MouseButton1Click:Connect(function()
+    if currentAlertServer then
+        hideAlertBanner()
+        joinServer(currentAlertServer.jobId, currentAlertServer.placeId)
+    end
+end)
+
+-- CONTENEDOR PRINCIPAL DEL HUB
 local mainContainer = Instance.new("Frame")
 mainContainer.Name = "MainContainer"
 mainContainer.Size = UDim2.new(0, 375, 0, 490)
@@ -611,7 +769,6 @@ stealView.Position = UDim2.new(0, 0, 0, 26)
 stealView.BackgroundTransparency = 1
 stealView.Parent = mainContainer
 
--- Encabezado Steal Panel
 local stealHeader = Instance.new("Frame")
 stealHeader.Name = "StealHeader"
 stealHeader.Size = UDim2.new(1, 0, 0, 48)
@@ -770,7 +927,6 @@ chilliView.BackgroundTransparency = 1
 chilliView.Visible = false
 chilliView.Parent = mainContainer
 
--- Encabezado Chilli Finder con Gradiente
 local chilliHeader = Instance.new("Frame")
 chilliHeader.Name = "ChilliHeader"
 chilliHeader.Size = UDim2.new(1, 0, 0, 48)
@@ -852,7 +1008,6 @@ cFilterLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 cFilterLayout.Padding = UDim.new(0, 5)
 cFilterLayout.Parent = cFilterBar
 
--- 1. FORCE JOIN 60s
 local cForceBtn = Instance.new("TextButton")
 cForceBtn.Size = UDim2.new(0.24, 0, 1, 0)
 cForceBtn.BackgroundColor3 = THEME.GreenBtn
@@ -871,7 +1026,6 @@ cFStroke.Color = Color3.fromRGB(20, 20, 25)
 cFStroke.Thickness = 1.5
 cFStroke.Parent = cForceBtn
 
--- 2. MIN VALUE 1T/s
 local cMinValBtn = Instance.new("TextButton")
 cMinValBtn.Size = UDim2.new(0.24, 0, 1, 0)
 cMinValBtn.BackgroundColor3 = THEME.SkyBlueBtn
@@ -890,7 +1044,6 @@ cMvStroke.Color = Color3.fromRGB(20, 20, 25)
 cMvStroke.Thickness = 1.5
 cMvStroke.Parent = cMinValBtn
 
--- 3. RARITY Any
 local cRarityBtn = Instance.new("TextButton")
 cRarityBtn.Size = UDim2.new(0.24, 0, 1, 0)
 cRarityBtn.BackgroundColor3 = THEME.DarkBlueBtn
@@ -909,7 +1062,6 @@ cRStroke.Color = Color3.fromRGB(20, 20, 25)
 cRStroke.Thickness = 1.5
 cRStroke.Parent = cRarityBtn
 
--- 4. ACCOUNT Free
 local cAccBtn = Instance.new("TextButton")
 cAccBtn.Size = UDim2.new(0.24, 0, 1, 0)
 cAccBtn.BackgroundColor3 = THEME.GoldBadge
@@ -928,7 +1080,6 @@ cAStroke.Color = Color3.fromRGB(20, 20, 25)
 cAStroke.Thickness = 1.5
 cAStroke.Parent = cAccBtn
 
--- Subtítulo saludo
 local cSubTitle = Instance.new("TextLabel")
 cSubTitle.Size = UDim2.new(1, -16, 0, 18)
 cSubTitle.Position = UDim2.new(0, 8, 0, 100)
@@ -940,7 +1091,6 @@ cSubTitle.TextColor3 = Color3.fromRGB(200, 205, 220)
 cSubTitle.TextXAlignment = Enum.TextXAlignment.Center
 cSubTitle.Parent = chilliView
 
--- Lista de servidores Chilli Finder
 local cScroll = Instance.new("ScrollingFrame")
 cScroll.Size = UDim2.new(1, -16, 1, -125)
 cScroll.Position = UDim2.new(0, 8, 0, 122)
@@ -959,11 +1109,182 @@ cListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
     cScroll.CanvasSize = UDim2.new(0, 0, 0, cListLayout.AbsoluteContentSize.Y + 12)
 end)
 
+-- ==============================================================
+-- MODAL DE AJUSTES ⚙️ (CONFIGURAR URL CLOUD API Y RADAR)
+-- ==============================================================
+local settingsModal = Instance.new("Frame")
+settingsModal.Name = "SettingsModal"
+settingsModal.Size = UDim2.new(0, 320, 0, 340)
+settingsModal.Position = UDim2.new(0.5, -160, 0.5, -170)
+settingsModal.BackgroundColor3 = Color3.fromRGB(22, 24, 30)
+settingsModal.BorderSizePixel = 0
+settingsModal.Visible = false
+settingsModal.ZIndex = 15
+settingsModal.Parent = screenGui
+
+local smCorner = Instance.new("UICorner")
+smCorner.CornerRadius = UDim.new(0, 10)
+smCorner.Parent = settingsModal
+
+local smStroke = Instance.new("UIStroke")
+smStroke.Color = Color3.fromRGB(60, 160, 255)
+smStroke.Thickness = 2
+smStroke.Parent = settingsModal
+
+local smTitle = Instance.new("TextLabel")
+smTitle.Size = UDim2.new(1, 0, 0, 38)
+smTitle.BackgroundTransparency = 1
+smTitle.Text = "⚙️ Configuración del Radar & API"
+smTitle.Font = Enum.Font.GothamBlack
+smTitle.TextSize = 14
+smTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+smTitle.ZIndex = 16
+smTitle.Parent = settingsModal
+
+-- Input URL de la API
+local urlLabel = Instance.new("TextLabel")
+urlLabel.Size = UDim2.new(1, -24, 0, 18)
+urlLabel.Position = UDim2.new(0, 12, 0, 42)
+urlLabel.BackgroundTransparency = 1
+urlLabel.Text = "API Backend URL (Gratis / Cloud):"
+urlLabel.Font = Enum.Font.GothamBold
+urlLabel.TextSize = 11
+urlLabel.TextColor3 = Color3.fromRGB(180, 185, 200)
+urlLabel.TextXAlignment = Enum.TextXAlignment.Left
+urlLabel.ZIndex = 16
+urlLabel.Parent = settingsModal
+
+local urlInput = Instance.new("TextBox")
+urlInput.Size = UDim2.new(1, -24, 0, 32)
+urlInput.Position = UDim2.new(0, 12, 0, 64)
+urlInput.BackgroundColor3 = Color3.fromRGB(32, 34, 42)
+urlInput.Text = State.BackendUrl
+urlInput.PlaceholderText = "https://tu-api.onrender.com"
+urlInput.Font = Enum.Font.Gotham
+urlInput.TextSize = 12
+urlInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+urlInput.ZIndex = 16
+urlInput.Parent = settingsModal
+
+local urlInCorner = Instance.new("UICorner")
+urlInCorner.CornerRadius = UDim.new(0, 6)
+urlInCorner.Parent = urlInput
+
+-- Umbral mínimo para alerta de radar
+local thLabel = Instance.new("TextLabel")
+thLabel.Size = UDim2.new(1, -24, 0, 18)
+thLabel.Position = UDim2.new(0, 12, 0, 106)
+thLabel.BackgroundTransparency = 1
+thLabel.Text = "Alerta de Radar si el huevo supera:"
+thLabel.Font = Enum.Font.GothamBold
+thLabel.TextSize = 11
+thLabel.TextColor3 = Color3.fromRGB(180, 185, 200)
+thLabel.TextXAlignment = Enum.TextXAlignment.Left
+thLabel.ZIndex = 16
+thLabel.Parent = settingsModal
+
+local thRow = Instance.new("Frame")
+thRow.Size = UDim2.new(1, -24, 0, 28)
+thRow.Position = UDim2.new(0, 12, 0, 128)
+thRow.BackgroundTransparency = 1
+thRow.ZIndex = 16
+thRow.Parent = settingsModal
+
+local thLayout = Instance.new("UIListLayout")
+thLayout.FillDirection = Enum.FillDirection.Horizontal
+thLayout.Padding = UDim.new(0, 6)
+thLayout.Parent = thRow
+
+local thOptions = {
+    { text = "100M/s", val = 100e6 },
+    { text = "1B/s", val = 1e9 },
+    { text = "10B/s", val = 10e9 },
+    { text = "50B/s", val = 50e9 }
+}
+
+for _, opt in ipairs(thOptions) do
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0.23, 0, 1, 0)
+    btn.BackgroundColor3 = State.Radar.MinAlertValue == opt.val and THEME.GreenBtn or Color3.fromRGB(45, 48, 60)
+    btn.Text = opt.text
+    btn.Font = Enum.Font.GothamBlack
+    btn.TextSize = 10
+    btn.TextColor3 = State.Radar.MinAlertValue == opt.val and Color3.fromRGB(20, 20, 25) or Color3.fromRGB(240, 240, 240)
+    btn.ZIndex = 16
+    btn.Parent = thRow
+
+    local bCorner = Instance.new("UICorner")
+    bCorner.CornerRadius = UDim.new(0, 6)
+    bCorner.Parent = btn
+
+    btn.MouseButton1Click:Connect(function()
+        State.Radar.MinAlertValue = opt.val
+        State.Radar.MinAlertText = opt.text
+        for _, b in ipairs(thRow:GetChildren()) do
+            if b:IsA("TextButton") then
+                b.BackgroundColor3 = b.Text == opt.text and THEME.GreenBtn or Color3.fromRGB(45, 48, 60)
+                b.TextColor3 = b.Text == opt.text and Color3.fromRGB(20, 20, 25) or Color3.fromRGB(240, 240, 240)
+            end
+        end
+    end)
+end
+
+-- Toggle Sonido de Alerta
+local soundToggle = Instance.new("TextButton")
+soundToggle.Size = UDim2.new(1, -24, 0, 32)
+soundToggle.Position = UDim2.new(0, 12, 0, 172)
+soundToggle.BackgroundColor3 = State.Radar.SoundAlert and THEME.GreenBtn or THEME.RedBtn
+soundToggle.Text = State.Radar.SoundAlert and "🔊 Sonido de Alerta: ACTIVADO" or "🔇 Sonido de Alerta: DESACTIVADO"
+soundToggle.Font = Enum.Font.GothamBold
+soundToggle.TextSize = 12
+soundToggle.TextColor3 = Color3.fromRGB(20, 20, 25)
+soundToggle.ZIndex = 16
+soundToggle.Parent = settingsModal
+
+local stCorner = Instance.new("UICorner")
+stCorner.CornerRadius = UDim.new(0, 6)
+stCorner.Parent = soundToggle
+
+soundToggle.MouseButton1Click:Connect(function()
+    State.Radar.SoundAlert = not State.Radar.SoundAlert
+    soundToggle.BackgroundColor3 = State.Radar.SoundAlert and THEME.GreenBtn or THEME.RedBtn
+    soundToggle.Text = State.Radar.SoundAlert and "🔊 Sonido de Alerta: ACTIVADO" or "🔇 Sonido de Alerta: DESACTIVADO"
+end)
+
+-- Botón Guardar y Cerrar
+local saveBtn = Instance.new("TextButton")
+saveBtn.Size = UDim2.new(1, -24, 0, 36)
+saveBtn.Position = UDim2.new(0, 12, 1, -48)
+saveBtn.BackgroundColor3 = Color3.fromRGB(60, 160, 255)
+saveBtn.Text = "Guardar y Cerrar"
+saveBtn.Font = Enum.Font.GothamBlack
+saveBtn.TextSize = 13
+saveBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+saveBtn.ZIndex = 16
+saveBtn.Parent = settingsModal
+
+local svCorner = Instance.new("UICorner")
+svCorner.CornerRadius = UDim.new(0, 6)
+svCorner.Parent = saveBtn
+
+local function toggleSettings()
+    settingsModal.Visible = not settingsModal.Visible
+end
+
+sSettingsBtn.MouseButton1Click:Connect(toggleSettings)
+cSettingsBtn.MouseButton1Click:Connect(toggleSettings)
+
+saveBtn.MouseButton1Click:Connect(function()
+    if urlInput.Text ~= "" then
+        State.BackendUrl = urlInput.Text:gsub("%s+", "")
+    end
+    settingsModal.Visible = false
+    print("[Config] Ajustes guardados. Backend URL: " .. State.BackendUrl)
+end)
+
 -- ==========================================
 -- RENDERIZADO DE ELEMENTOS EN CADA LISTA
 -- ==========================================
-
--- Tarjeta de Steal Panel (Huevos Locales)
 local function renderStealCard(eggData, index)
     local card = Instance.new("Frame")
     card.Size = UDim2.new(1, -4, 0, 66)
@@ -1091,7 +1412,6 @@ local function renderStealCard(eggData, index)
     end)
 end
 
--- Tarjeta de Chilli Finder (Servidores Remotos)
 local function renderChilliCard(serverData, index)
     local card = Instance.new("Frame")
     card.Size = UDim2.new(1, -4, 0, 66)
@@ -1109,7 +1429,6 @@ local function renderChilliCard(serverData, index)
     cardStroke.Thickness = 1.2
     cardStroke.Parent = card
 
-    -- Thumbnail con bestia (ej: Werewolf 🐺)
     local thumbBox = Instance.new("Frame")
     thumbBox.Size = UDim2.new(0, 52, 0, 52)
     thumbBox.Position = UDim2.new(0, 7, 0.5, -26)
@@ -1161,7 +1480,6 @@ local function renderChilliCard(serverData, index)
     statsLayout.Padding = UDim.new(0, 6)
     statsLayout.Parent = statsRow
 
-    -- $54.14B/s
     local rateLabel = Instance.new("TextLabel")
     rateLabel.AutomaticSize = Enum.AutomaticSize.X
     rateLabel.BackgroundTransparency = 1
@@ -1171,7 +1489,6 @@ local function renderChilliCard(serverData, index)
     rateLabel.TextColor3 = THEME.GreenText
     rateLabel.Parent = statsRow
 
-    -- Multiplicador x9.35
     local multLabel = Instance.new("TextLabel")
     multLabel.AutomaticSize = Enum.AutomaticSize.X
     multLabel.BackgroundTransparency = 1
@@ -1181,7 +1498,6 @@ local function renderChilliCard(serverData, index)
     multLabel.TextColor3 = THEME.JoinGold
     multLabel.Parent = statsRow
 
-    -- Tiempo (2m ago)
     local timeLabel = Instance.new("TextLabel")
     timeLabel.AutomaticSize = Enum.AutomaticSize.X
     timeLabel.BackgroundTransparency = 1
@@ -1191,7 +1507,6 @@ local function renderChilliCard(serverData, index)
     timeLabel.TextColor3 = Color3.fromRGB(180, 185, 200)
     timeLabel.Parent = statsRow
 
-    -- BOTÓN DORADO [ Join ]
     local joinBtn = Instance.new("TextButton")
     joinBtn.Size = UDim2.new(0, 78, 0, 44)
     joinBtn.Position = UDim2.new(1, -85, 0.5, -22)
@@ -1219,9 +1534,7 @@ local function renderChilliCard(serverData, index)
     end)
 end
 
--- ==========================================
--- FUNCIONES DE REFRESCO DE LISTAS
--- ==========================================
+-- Refrescar listas
 local function refreshStealList()
     for _, child in ipairs(sScroll:GetChildren()) do
         if child:IsA("Frame") then child:Destroy() end
@@ -1265,9 +1578,6 @@ local function refreshChilliList()
     end
 end
 
--- ==========================================
--- INTERACCIÓN Y NAVEGACIÓN
--- ==========================================
 local function switchTab(tabName)
     State.CurrentTab = tabName
     if tabName == "StealPanel" then
@@ -1361,13 +1671,14 @@ cAccBtn.MouseButton1Click:Connect(function()
     cAccBtn.Text = "ACCOUNT\n" .. State.AccountTier
 end)
 
--- ==========================================
--- BUCLES EN SEGUNDO PLANO (AUTO STEAL Y AUTO HOP)
--- ==========================================
+-- ==============================================================
+-- 10. BUCLES EN SEGUNDO PLANO (AUTO STEAL, RADAR Y TELEMETRÍA)
+-- ==============================================================
+
+-- BUCLE 1: Auto Steal Local
 task.spawn(function()
     while genv._STEAL_PANEL_LOADED do
         task.wait(1.0)
-        -- Auto Steal
         if State.AutoSteal then
             local eggs = scanLocalEggs()
             local best = nil
@@ -1382,8 +1693,51 @@ task.spawn(function()
                 task.wait(1.5)
             end
         end
+    end
+end)
 
-        -- Temporizador de Force Join en Chilli Finder
+-- BUCLE 2: Telemetría saliente (Comparte tus huevos con la API en la nube)
+task.spawn(function()
+    while genv._STEAL_PANEL_LOADED do
+        task.wait(5.0) -- Envía telemetría cada 5s
+        pcall(reportCurrentServer)
+    end
+end)
+
+-- BUCLE 3: 🚨 RADAR EN VIVO (Escucha nuevos huevos valiosos en otros servidores)
+task.spawn(function()
+    while genv._STEAL_PANEL_LOADED do
+        task.wait(3.0) -- Consulta la API cada 3s
+        if State.Radar.Enabled then
+            pcall(function()
+                local remoteServers = fetchRemoteServers()
+                for _, srv in ipairs(remoteServers) do
+                    -- Si el servidor es remoto y supera el umbral de alerta
+                    if srv.jobId ~= game.JobId and srv.rateVal >= State.Radar.MinAlertValue then
+                        if not State.Radar.SeenServers[srv.jobId] then
+                            State.Radar.SeenServers[srv.jobId] = true
+                            
+                            -- ¡Disparar Alerta en Pantalla!
+                            showAlertBanner(srv)
+
+                            -- Si el AutoHop está activo, unirse directamente
+                            if State.AutoHop then
+                                task.wait(1.5)
+                                joinServer(srv.jobId, srv.placeId)
+                            end
+                            break
+                        end
+                    end
+                end
+            end)
+        end
+    end
+end)
+
+-- BUCLE 4: Temporizador Force Join (Chilli Finder)
+task.spawn(function()
+    while genv._STEAL_PANEL_LOADED do
+        task.wait(1.0)
         if State.AutoHop then
             State.ForceJoinTimer = State.ForceJoinTimer - 1
             if State.ForceJoinTimer <= 0 then
@@ -1398,7 +1752,7 @@ task.spawn(function()
     end
 end)
 
--- Refresco periódico de listas
+-- BUCLE 5: Refresco periódico de listas en la UI
 task.spawn(function()
     refreshStealList()
     refreshChilliList()
@@ -1413,6 +1767,7 @@ task.spawn(function()
 end)
 
 print("=====================================================")
-print("🥚 DUAL HUB CARGADO: STEAL PANEL & CHILLI FINDER")
-print("🔥 Robo de huevos local + Server Hopper global activo")
+print("🥚 RADAR EN VIVO & CHILLI HUB CARGADO CON ÉXITO")
+print("📡 Conectado a la API: " .. State.BackendUrl)
+print("🚨 Radar activo: Notificará cuando detecte huevos >= " .. State.Radar.MinAlertText)
 print("=====================================================")

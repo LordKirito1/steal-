@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: steal-an-egg-api
+    env: node
+    plan: free
+    rootDir: Backend
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: PORT
+        value: 3000
+      - key: SERVER_TTL
+        value: 180
