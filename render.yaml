@@ -3,7 +3,6 @@ services:
     name: steal-an-egg-api
     env: node
     plan: free
-    rootDir: Backend
     buildCommand: npm install
     startCommand: npm start
     envVars:
